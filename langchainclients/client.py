@@ -57,7 +57,7 @@ async def run_agent():
                 print("Agent created with tools:", [tool.name for tool in tools])
                 
                 # Create the LangGraph agent
-                agent = create_react_agent(llm, tools, prompt="你是一家工业品公司的推荐助手，帮助用户找到合适的产品。请根据用户的查询提供相关产品信息。")
+                agent = create_react_agent(llm, tools, prompt="你是一家工业品公司的推荐助手，帮助用户找到合适的产品。请根据用户的查询提供相关产品信息。要求回复用户的所有数据都需要从用户配置的数据库中来。")
                 
                 print("MCP Client Started! Type 'quit' to exit.")
                 while True:
