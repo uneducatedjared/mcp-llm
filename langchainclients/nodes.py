@@ -108,17 +108,3 @@ def process_user_query(user_input):
             return "无法识别您的查询类型，请尝试重新描述您的问题。"
     else:
         return "无法识别您的查询类型，请尝试重新描述您的问题。"
-
-
-# 示例用法
-if __name__ == "__main__":
-    # 测试型号查询
-    print(process_user_query("iPhone14的信息"))
-    print("\n---\n")
-    print(process_user_query("iPhone14和GalaxyS23对比"))
-    print("\n---\n")
-    
-    # 测试品类查询
-    print(process_user_query("智能手机有哪些"))
-    print("\n---\n")
-    print(process_user_query("推荐平板电脑"))    

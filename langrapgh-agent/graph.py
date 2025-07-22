@@ -23,12 +23,14 @@ def xiaofanAgent():
 
     # intent_detection分支
     graph.add_conditional_edges(
-        "intent_detection",
-        lambda state: (
-            "clarification" if state.get("clarification_needed", False)
-            else state.get("intent")
-        )
+    "intent_detection",
+    lambda state: (
+        "clarification" if state.get("clarification_needed", False)
+        else "mumble_search" if state.get("intent", "") == "mumble_search"
+        else "detail_search" if state.get("intent", "") == "detail_search"
+        else "clarification" 
     )
+)
 
     # detail_search分支
     graph.add_conditional_edges(
@@ -52,7 +54,8 @@ def xiaofanAgent():
     graph.add_conditional_edges(
         "clarification",
         lambda state: (
-            state.get("intent") if state.get("clarification_answer") else "clarification"
+            "intent_detection" if state.get("clarification_answer")
+            else "clarification"
         )
     )
 
@@ -70,7 +73,7 @@ graph = build_graph()
 
 # 入口参数要和AgentState字段一致
 inputs = {
-    "user_input": "推荐适合户外场景的热成像仪"
+    "user_input": "测试家庭中的地暖，应该用什么型号的热成像仪？"
 }
 
 graph.invoke(inputs)

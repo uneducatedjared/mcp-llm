@@ -12,62 +12,62 @@ from openai import AsyncOpenAI
 class MCPClient:
     def __init__(self, model_name: str, base_url: str, api_key: str, server_urls: List[str]):
         """
-        ³õÊ¼»¯ MCP ¿Í»§¶Ë£¬Á¬½Ó OpenAI ½Ó¿Ú¡£
-        :param model_name: Ê¹ÓÃµÄÄ£ĞÍÃû³Æ£¬ÀıÈç "deepseek-chat"¡£
-        :param base_url: OpenAI ½Ó¿ÚµÄ»ù´¡µØÖ·£¬ÀıÈç "https://api.deepseek.com/v1"¡£
-        :param api_key: OpenAI API ÃÜÔ¿£¬ÓÃÓÚÉí·İÑéÖ¤¡£
-        :param server_urls: SSE ·şÎñµØÖ·ÁĞ±í£¬ÓÃÓÚÁ¬½Ó¶à¸ö·şÎñÆ÷¡£
+        åˆå§‹åŒ– MCP å®¢æˆ·ç«¯ï¼Œå¯¹æ¥ OpenAI æ¥å£ã€‚
+        :param model_name: ä½¿ç”¨çš„æ¨¡å‹åç§°ï¼Œä¾‹å¦‚ "deepseek-chat"ã€‚
+        :param base_url: OpenAI æ¥å£çš„åŸºç¡€åœ°å€ï¼Œä¾‹å¦‚ "https://api.deepseek.com/v1"ã€‚
+        :param api_key: OpenAI API å¯†é’¥ï¼Œç”¨äºèº«ä»½éªŒè¯ã€‚
+        :param server_urls: SSE æœåŠ¡åœ°å€åˆ—è¡¨ï¼Œç”¨äºè¿æ¥åç«¯æœåŠ¡ã€‚
         """
         self.model_name = model_name
         self.server_urls = server_urls
-        self.sessions = {}  # ´æ´¢Ã¿¸ö·şÎñÆ÷µÄ»á»°¼°ÆäÉÏÏÂÎÄ£ºserver_id -> (session, session_context, streams_context)
-        self.tool_mapping = {}  # ¹¤¾ßÓ³Éä£ºprefixed_name -> (session, original_tool_name)
+        self.sessions = {}  # å­˜å‚¨æ¯ä¸ªæœåŠ¡çš„ä¼šè¯ä¿¡æ¯ï¼Œæ ¼å¼ï¼šserver_id -> (session, session_context, streams_context)
+        self.tool_mapping = {}  # å·¥å…·æ˜ å°„ï¼šprefixed_name -> (session, original_tool_name)
 
-        # ³õÊ¼»¯ OpenAI Òì²½¿Í»§¶Ë
+        # åˆå§‹åŒ– OpenAI å¼‚æ­¥å®¢æˆ·ç«¯
         self.client = AsyncOpenAI(base_url=base_url, api_key=api_key)
 
     async def initialize_sessions(self):
         """
-        ³õÊ¼»¯ÓëËùÓĞ SSE ·şÎñÆ÷µÄÁ¬½Ó£¬²¢»ñÈ¡¿ÉÓÃ¹¤¾ßÁĞ±í¡£
+        åˆå§‹åŒ–æ‰€æœ‰ SSE æœåŠ¡è¿æ¥ï¼Œå¹¶è·å–å·¥å…·åˆ—è¡¨ã€‚
         """
         for i, server_url in enumerate(self.server_urls):
-            server_id = f"server{i}"  # ÎªÃ¿¸ö·şÎñÆ÷Éú³ÉÎ¨Ò»±êÊ¶·û
-            # ´´½¨ SSE ¿Í»§¶Ë²¢½øÈëÉÏÏÂÎÄ
+            server_id = f"server{i}"  # ä¸ºæ¯ä¸ªæœåŠ¡ç”Ÿæˆå”¯ä¸€æ ‡è¯†
+            # åˆ›å»º SSE å®¢æˆ·ç«¯è¿æ¥ä¸Šä¸‹æ–‡
             streams_context = sse_client(url=server_url)
             streams = await streams_context.__aenter__()
             session_context = ClientSession(*streams)
             session = await session_context.__aenter__()
             await session.initialize()
 
-            # ´æ´¢»á»°¼°ÆäÉÏÏÂÎÄ
+            # å­˜å‚¨ä¼šè¯ç›¸å…³ä¿¡æ¯
             self.sessions[server_id] = (session, session_context, streams_context)
 
-            # »ñÈ¡¹¤¾ßÁĞ±í²¢½¨Á¢Ó³Éä
+            # è·å–å·¥å…·åˆ—è¡¨å¹¶å»ºç«‹æ˜ å°„
             response = await session.list_tools()
             for tool in response.tools:
-                prefixed_name = f"{server_id}_{tool.name}"  # Îª¹¤¾ßÃûÌí¼Ó·şÎñÆ÷Ç°×º
+                prefixed_name = f"{server_id}_{tool.name}"  # ä¸ºå·¥å…·åæ·»åŠ æœåŠ¡å‰ç¼€ï¼ˆé¿å…é‡åï¼‰
                 self.tool_mapping[prefixed_name] = (session, tool.name)
-            print(f"ÒÑÁ¬½Óµ½ {server_url}£¬¹¤¾ßÁĞ±í£º{[tool.name for tool in response.tools]}")
+            print(f"å·²è¿æ¥ {server_url}ï¼Œå·¥å…·åˆ—è¡¨ï¼š{[tool.name for tool in response.tools]}")
 
     async def cleanup(self):
         """
-        ÇåÀíËùÓĞ»á»°ºÍÁ¬½Ó×ÊÔ´£¬È·±£ÎŞ×ÊÔ´Ğ¹Â©¡£
+        æ¸…ç†æ‰€æœ‰ä¼šè¯åŠèµ„æºï¼Œç¡®ä¿èµ„æºæ­£ç¡®é‡Šæ”¾ã€‚
         """
         for server_id, (session, session_context, streams_context) in self.sessions.items():
-            await session_context.__aexit__(None, None, None)  # ÍË³ö»á»°ÉÏÏÂÎÄ
-            await streams_context.__aexit__(None, None, None)  # ÍË³ö SSE Á÷ÉÏÏÂÎÄ
-        print("ËùÓĞ»á»°ÒÑÇåÀí¡£")
+            await session_context.__aexit__(None, None, None)  # é€€å‡ºä¼šè¯ä¸Šä¸‹æ–‡
+            await streams_context.__aexit__(None, None, None)  # é€€å‡º SSE è¿æ¥ä¸Šä¸‹æ–‡
+        print("æ‰€æœ‰ä¼šè¯å·²æ¸…ç†å®Œæ¯•")
 
     async def process_query(self, query: str) -> str:
         """
-        ´¦ÀíÓÃ»§µÄ×ÔÈ»ÓïÑÔ²éÑ¯£¬Í¨¹ı¹¤¾ßµ÷ÓÃÍê³ÉÈÎÎñ²¢·µ»Ø½á¹û¡£
+        å¤„ç†ç”¨æˆ·æŸ¥è¯¢ï¼Œé€šè¿‡æ¨¡å‹åˆ¤æ–­æ˜¯å¦è°ƒç”¨å·¥å…·ï¼Œå¹¶è¿”å›æœ€ç»ˆç»“æœã€‚
 
-        :param query: ÓÃ»§ÊäÈëµÄ²éÑ¯×Ö·û´®¡£
-        :return: ´¦ÀíºóµÄ»Ø¸´ÎÄ±¾¡£
+        :param query: ç”¨æˆ·è¾“å…¥çš„æŸ¥è¯¢å­—ç¬¦ä¸²
+        :return: æ•´ç†åçš„å›ç­”æ–‡æœ¬
         """
-        messages = [{"role": "user", "content": query}]  # ³õÊ¼»¯ÏûÏ¢ÁĞ±í
+        messages = [{"role": "user", "content": query}]  # åˆå§‹åŒ–æ¶ˆæ¯åˆ—è¡¨
 
-        # ÊÕ¼¯ËùÓĞ¿ÉÓÃ¹¤¾ß
+        # æ”¶é›†å¯ç”¨å·¥å…·
         available_tools = []
         for server_id, (session, _, _) in self.sessions.items():
             response = await session.list_tools()
@@ -82,18 +82,18 @@ class MCPClient:
                     },
                 })
 
-        # ÏòÄ£ĞÍ·¢ËÍ³õÊ¼ÇëÇó
+        # å‘æ¨¡å‹å‘é€åˆå§‹è¯·æ±‚
         response = await self.client.chat.completions.create(
             model=self.model_name,
             messages=messages,
             tools=available_tools,
         )
 
-        final_text = []  # ´æ´¢×îÖÕ»Ø¸´ÄÚÈİ
+        final_text = []  # å­˜å‚¨æœ€ç»ˆå›ç­”å†…å®¹
         message = response.choices[0].message
-        final_text.append(message.content or "")  # Ìí¼ÓÄ£ĞÍµÄ³õÊ¼»Ø¸´
+        final_text.append(message.content or "")  # æ·»åŠ æ¨¡å‹çš„åˆå§‹å›ç­”
 
-        # ´¦Àí¹¤¾ßµ÷ÓÃ
+        # å¤„ç†å·¥å…·è°ƒç”¨
         while message.tool_calls:
             for tool_call in message.tool_calls:
                 prefixed_name = tool_call.function.name
@@ -103,10 +103,10 @@ class MCPClient:
                     try:
                         result = await session.call_tool(original_tool_name, tool_args)
                     except Exception as e:
-                        result = {"content": f"µ÷ÓÃ¹¤¾ß {original_tool_name} ³ö´í£º{str(e)}"}
+                        result = {"content": f"è°ƒç”¨å·¥å…· {original_tool_name} å¤±è´¥ï¼š{str(e)}"}
                         print(result["content"])
-                    final_text.append(f"[µ÷ÓÃ¹¤¾ß {prefixed_name} ²ÎÊı: {tool_args}]")
-                    final_text.append(f"¹¤¾ß½á¹û: {result.content}")
+                    final_text.append(f"[è°ƒç”¨å·¥å…· {prefixed_name} å‚æ•°ï¼š{tool_args}]")
+                    final_text.append(f"å·¥å…·è¿”å›ï¼š{result.content}")
                     messages.extend([
                         {
                             "role": "assistant",
@@ -119,10 +119,10 @@ class MCPClient:
                         {"role": "tool", "tool_call_id": tool_call.id, "content": str(result.content)},
                     ])
                 else:
-                    print(f"¹¤¾ß {prefixed_name} Î´ÕÒµ½")
-                    final_text.append(f"¹¤¾ß {prefixed_name} Î´ÕÒµ½")
+                    print(f"å·¥å…· {prefixed_name} æœªæ‰¾åˆ°")
+                    final_text.append(f"å·¥å…· {prefixed_name} æœªæ‰¾åˆ°")
 
-            # »ñÈ¡¹¤¾ßµ÷ÓÃºóµÄºóĞø»Ø¸´
+            # è·å–å·¥å…·è°ƒç”¨åçš„æ¨¡å‹å›ç­”
             response = await self.client.chat.completions.create(
                 model=self.model_name,
                 messages=messages,
@@ -136,37 +136,37 @@ class MCPClient:
 
     async def chat_loop(self):
         """
-        Æô¶¯ÃüÁîĞĞ½»»¥Ê½¶Ô»°Ñ­»·£¬½ÓÊÜÓÃ»§ÊäÈë²¢ÏÔÊ¾»Ø¸´¡£
+        å¯åŠ¨äº¤äº’å¼èŠå¤©å¾ªç¯ï¼Œæ¥æ”¶ç”¨æˆ·è¾“å…¥å¹¶æ˜¾ç¤ºå›ç­”ã€‚
         """
-        print("\nMCP ¿Í»§¶ËÒÑÆô¶¯£¬ÊäÈëÄãµÄÎÊÌâ£¬ÊäÈë 'quit' ÍË³ö¡£")
+        print("\nMCP å®¢æˆ·ç«¯å·²å¯åŠ¨ï¼Œå¯è¾“å…¥é—®é¢˜ï¼Œè¾“å…¥ 'quit' é€€å‡º")
         while True:
             try:
-                query = input("\nÎÊÌâ: ").strip()
+                query = input("\næé—®ï¼š").strip()
                 if query.lower() == "quit":
                     break
                 response = await self.process_query(query)
                 print("\n" + response)
             except Exception as e:
-                print(f"\n·¢Éú´íÎó: {str(e)}")
+                print(f"\nå¤„ç†é”™è¯¯ï¼š{str(e)}")
 
 
 async def main():
-    load_dotenv()  # ¼ÓÔØ»·¾³±äÁ¿
+    load_dotenv()  # åŠ è½½ç¯å¢ƒå˜é‡
     """
-    ³ÌĞòÈë¿Ú£¬ÉèÖÃÅäÖÃ²¢Æô¶¯ MCP ¿Í»§¶Ë¡£
+    ä¸»å‡½æ•°ï¼šåˆå§‹åŒ–å¹¶è¿è¡Œ MCP å®¢æˆ·ç«¯ã€‚
     """
-    # ´Ó»·¾³±äÁ¿»ñÈ¡ÅäÖÃ
+    # ä»ç¯å¢ƒå˜é‡è·å–é…ç½®
     model_name = "deepseek-chat"
     base_url = "https://api.deepseek.com/v1"
     api_key = os.getenv("DEEPSEEK_API_KEY")
     if not api_key:
-        print("Î´ÉèÖÃ API_KEY »·¾³±äÁ¿¡£")
+        print("æœªé…ç½® API_KEYï¼Œè¯·æ£€æŸ¥ç¯å¢ƒå˜é‡")
         sys.exit(1)
 
-    # ¶¨Òå SSE ·şÎñÆ÷µØÖ·ÁĞ±í
+    # SSE æœåŠ¡åœ°å€åˆ—è¡¨
     server_urls = ["http://localhost:3000/sse"]
 
-    # ´´½¨²¢ÔËĞĞ¿Í»§¶Ë
+    # åˆå§‹åŒ–å®¢æˆ·ç«¯
     client = MCPClient(model_name=model_name, base_url=base_url, api_key=api_key, server_urls=server_urls)
     try:
         await client.initialize_sessions()
