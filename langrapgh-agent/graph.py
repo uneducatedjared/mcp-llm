@@ -70,7 +70,7 @@ graph = build_graph()
 
 # 入口参数要和AgentState字段一致
 inputs = {
-    "user_input": "推荐适合地暖场景的热成像仪"
+    "user_input": "推荐适合户外场景的热成像仪"
 }
 
 graph.invoke(inputs)

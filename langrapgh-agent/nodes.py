@@ -7,6 +7,7 @@ from state import AgentState
 from tools import get_tools_async
 import re
 import asyncio
+from langgraph.prebuilt import create_react_agent
 from langchain.schema import HumanMessage, SystemMessage
 
 load_dotenv()
@@ -112,14 +113,14 @@ def intent_detection(state: AgentState) -> AgentState:
             "clarification_needed": True,
             "clarification_question": "抱歉，我无法理解您的请求。请问您需要查询什么？"
         }
-    new_state = state.copy()
-    new_state["intent"] = intent_data.get("query_type")
-    new_state["product_lines"] = intent_data.get("product_lines", [])
-    new_state["product_params"] = intent_data.get("parameters", {"models": [], "criteria": {}})
-    new_state["clarification_needed"] = intent_data.get("clarification_needed", False)
-    new_state["clarification_question"] = intent_data.get("clarification_question", "")
+    state["intent"] = intent_data.get("query_type")
+    state["product_lines"] = intent_data.get("product_lines", [] )
+    state["product_params"] = intent_data.get("parameters", {"models": [], "criteria": {}})
+    state["clarification_needed"] = intent_data.get("clarification_needed", False)
+    state["clarification_question"] = intent_data.get("clarification_question", "")
+    print(state)
 
-    return new_state
+    return state
 
 
 # 场景匹配产品
@@ -127,47 +128,41 @@ from langchain.schema import HumanMessage, AIMessage
 
 def mumble_search(state: AgentState) -> AgentState:
     tools = asyncio.run(get_tools_async())
-    llm.bind_tools(tools)
-    tool_node = ToolNode(tools)
+    agent = create_react_agent(llm, tools)
     user_input = state.get("user_input", "")
     product_lines = state.get("product_lines", [])
+    print(state)
+#     prompt = f"""
+# 你现在是产品数据库检索助手。数据库表结构如下：
+# - id: int
+# - product_line: varchar(100)
+# - category: varchar(100)
+# - model: varchar(50)
+# - features: text
+# - application_scenarios: text
+# - parameters: json
 
-    prompt = f"""
-你现在是产品数据库检索助手。数据库表结构如下：
-- id: int
-- product_line: varchar(100)
-- category: varchar(100)
-- model: varchar(50)
-- features: text
-- application_scenarios: text
-- parameters: json
+# 请根据用户输入内容（user_input），在限定的产品线（product_lines）范围内，检索最相关的产品。
+# 检索时优先考虑 application_scenarios、features、字段的匹配度，返回最符合用户需求的产品信息。
 
-请根据用户输入内容（user_input），在限定的产品线（product_lines）范围内，检索最相关的产品。
-检索时优先考虑 application_scenarios、features、parameters 字段的匹配度，返回最符合用户需求的产品信息。
+# 用户输入: {user_input}
+# 限定产品线: {', '.join(product_lines)}
 
-用户输入: {user_input}
-限定产品线: {', '.join(product_lines)}
+# 请以 JSON 格式返回产品列表，每个产品包含：model、features、application_scenarios、parameters 的核心信息。
+# """
 
-请以 JSON 格式返回产品列表，每个产品包含：model、features、application_scenarios、parameters 的核心信息。
-"""
-
-    try:
-        # 添加系统提示或空的 AIMessage
-        inputs_for_agent = {"messages": [
-            SystemMessage(content="请根据用户需求返回产品信息。"),
-            HumanMessage(content=prompt),
-            AIMessage(content="")  # 补充一个空的AIMessage
-            ]}
-
-        result = tool_node.invoke(inputs_for_agent)
-        print(result)
-        formatted = json.dumps(result, ensure_ascii=False, indent=2, cls=CustomEncoder)
-        print(formatted)
-        state["product_info"] = result.get("products", [])
-
-    except Exception as e:
-        print(f"mumble_search error: {e}")
-        state["product_info"] = []
+#     try:
+#         inputs_for_agent = {"messages": [HumanMessage(content=prompt)]}
+#         print(state)
+#         result = asyncio.run(agent.ainvoke(inputs_for_agent))
+#         print(result)
+#         formatted = json.dumps(result, ensure_ascii=False, indent=2, cls=CustomEncoder)
+#         print(formatted)
+#         state["product_info"] = result.get("products", [])
+#         state["messages"] = state.get("messages", []) + [HumanMessage(content=prompt)]
+#     except Exception as e:
+#         print(f"mumble_search error: {e}")
+#         state["product_info"] = []
     return state
 
 # 参数匹配产品
@@ -179,23 +174,18 @@ def clarification(state: AgentState) -> AgentState:
     """
     处理澄清请求，获取用户的澄清回答，并更新状态。
     """
-    print(f"Entering clarification node. Question: {state.get('clarification_question')}")
-    new_state = state.copy()
-    # 如果澄清问题为空，给出默认问题
-    if not new_state.get("clarification_question"):
-        new_state["clarification_question"] = "请详细描述您的需求。"
-    # 可以增加澄清次数计数，超过阈值直接结束
-    new_state.setdefault("clarification_count", 0)
-    new_state["clarification_count"] += 1
-    if new_state["clarification_count"] > 3:
-        new_state["response"] = "抱歉，无法理解您的需求，请联系人工客服。"
-        new_state["intent"] = None
-    return new_state
+    print("小凡不是很懂您的需求，请详细描述您所遇到的场景。")
+    clarification_answer = input()
+    state["clarification_answer"] = clarification_answer
+    state["clarification_needed"] = False
+
+    current_count = state.get("clarification_count", 0)
+    state["clarification_count"] = current_count + 1
+    return state
 
 # 结果生成节点
 def response_generation(state: AgentState):
     """根据状态中的产品信息和用户意图生成最终回答"""
-    # 提取状态中的关键信息（避免冗余数据干扰）
     product_info = state.get("product_info", [])
     parameter_info = state.get("parameter_info", [])
     user_input = state.get("user_input", "")
