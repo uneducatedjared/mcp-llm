@@ -13,6 +13,6 @@ class AgentState(TypedDict):
     parameter_info: List[Dict[str, Any]]  # 产品参数列表
     clarification_needed: bool  # 是否需要澄清问题
     clarification_answer: str  # 用户对澄清问题的回答
-    clarification_count: int  # 修正：将赋值改为注释
+    clarification_count: int  # 用户澄清了几次问题
     response: str  # 最终响应，由响应生成节点填充
     messages: Annotated[Sequence[BaseMessage], add_messages]  # 对话消息列表

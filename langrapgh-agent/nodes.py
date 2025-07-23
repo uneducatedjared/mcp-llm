@@ -2,6 +2,7 @@ from langchain_deepseek import ChatDeepSeek # Assuming this is available or you 
 import os
 from dotenv import load_dotenv
 import json
+from typing import Dict, Any, List
 from langgraph.prebuilt import ToolNode
 from state import AgentState
 from tools import get_tools_async
@@ -115,7 +116,10 @@ def intent_detection(state: AgentState) -> AgentState:
 from langchain.schema import HumanMessage, AIMessage
 from pydantic import BaseModel
 class aiJson(BaseModel):
-    product_info: str
+    product_info: Dict[str, Any] # 产品信息列表
+    parameter_info: Dict[str, Any]   # 产品参数列表
+
+
 
 def mumble_search(state: AgentState) -> AgentState:
     tools = asyncio.run(get_tools_async())
@@ -164,14 +168,56 @@ def mumble_search(state: AgentState) -> AgentState:
         print(product_lines)
         inputs_for_agent = {"messages": [HumanMessage(content=prompt)]}
         result = asyncio.run(agent.ainvoke(inputs_for_agent))
+        print(f"Type of result: {type(result)}")
+        print(f"Content of result: {result}")
         state["product_info"] = result["structured_response"]
+
     except Exception as e:
             print(f"其他错误: {e}")
     return state
 
+# RX-350的测温范围是多少？能否测到-40度到1500度
 # 参数匹配产品
 def detail_search(state: AgentState) -> AgentState:
-    pass
+    tools = asyncio.run(get_tools_async())
+    agent = create_react_agent(llm, tools, response_format=aiJson)
+    user_input = state.get("user_input", "")
+    product_lines = state.get("product_lines", [])
+    product_params = state.get("product_params", {"models": [], "criteria": {}})
+    models = product_params.get("models", [])
+    criteria = product_params.get("criteria", {})
+
+    prompt = f"""
+    你现在是产品数据库的检索助手，数据库表结构如下
+    - id: int
+    - product_line: varchar(100)
+    - category: varchar(100)
+    - model: varchar(50)
+    - features: text
+    - application_scenarios: text
+    - parameters: json
+    请根据用户输入的具体产品的型号或参数，从数据库精确检索相关产品，优先使用 'models' 中提取的产品型号和'parameter'中提取的产品参数进行精确匹配。
+    
+    用户查询：{user_input}
+    限定产品线：{','.join(product_lines)}
+    提取的产品型号{','.join(models) if models else " "}
+    提取的产品参数{json.dumps(criteria, ensure_ascii=False) if criteria else " "}
+
+    请以 JSON 格式返回产品列表，每个产品包含：model，features，parameters的和用户查询有关的信息
+    如果未能找到任何产品，请返回一个空的JSON数组
+    """
+    try:
+        inputs_for_agent = {"messages": [HumanMessage(content=prompt)]}
+        print(inputs_for_agent)
+        result = asyncio.run(agent.ainvoke(inputs_for_agent))
+        print(f"Type of result: {type(result)}")
+        print(f"Content of result: {result}")
+        state["product_info"] = result["structured_response"]
+        state["parameter_info"] = result["structured_response"]
+        print("更新后的state是：",state)
+    except Exception as e:
+        print(f"Error during detail search: {e}")
+    return state
 
 # 澄清问题节点+错误处理节点，处理intent问题和数据无法搜索到的问题
 def clarification(state: AgentState) -> AgentState:
@@ -182,7 +228,6 @@ def clarification(state: AgentState) -> AgentState:
     clarification_answer = input()
     state["clarification_answer"] = clarification_answer
     state["clarification_needed"] = False
-
     current_count = state.get("clarification_count", 0)
     state["clarification_count"] = current_count + 1
     return state
@@ -190,29 +235,47 @@ def clarification(state: AgentState) -> AgentState:
 # 结果生成节点
 def response_generation(state: AgentState):
     """根据状态中的产品信息和用户意图生成最终回答"""
+    intent = state.get("intent", "")
     product_info = state.get("product_info", [])
     parameter_info = state.get("parameter_info", [])
     user_input = state.get("user_input", "")
 
     # 构建提示词（聚焦核心信息，明确生成规则）
-    prompt = f"""
-    请根据以下信息生成用户所需的推荐回答：
-    1. 用户查询：{json.dumps(user_input, ensure_ascii=False)}
-    2. 产品信息：{json.dumps(product_info.model_dump(), ensure_ascii=False)}
-    3. 产品参数：{json.dumps(parameter_info, ensure_ascii=False)}
+    if(intent == "mumble_search"):
+        prompt = f"""
+        请根据以下信息生成用户所需的推荐回答：
+        1. 用户查询：{json.dumps(user_input, ensure_ascii=False)}
+        2. 产品信息：{json.dumps(product_info.model_dump(), ensure_ascii=False)}
+        3. 产品参数：{json.dumps(parameter_info, ensure_ascii=False)}
 
-    生成要求：
-    - 若没有相关产品信息，返回“抱歉，我没有找到相关产品。”
-    - 若有产品信息，按以下逻辑生成：
-      1. 先说明推荐结论
-      2. 按产品相关性排序（优先展示更匹配用户查询的型号）
-      3. 每个产品需要保留3-5个核心参数（和特点，避免冗余
-      4. 最后补充选择建议
-    - 语言简洁，总长度控制在300字内
-    """
+        生成要求：
+        - 若没有相关产品信息，返回“抱歉，我没有找到相关产品。”
+        - 若有产品信息，按以下逻辑生成：
+        1. 先说明推荐结论
+        2. 按产品相关性排序（优先展示更匹配用户查询的型号）
+        3. 每个产品需要保留3-5个核心参数和特点，避免冗余
+        4. 最后补充选择建议
+        - 语言简洁，总长度控制在300字内
+        """
+    else:
+        prompt = f"""
+        请根据以下信息生成用户所需的推荐回答：
+        1. 用户查询：{json.dumps(user_input, ensure_ascii=False)}
+        2. 产品信息：{json.dumps(product_info.model_dump(), ensure_ascii=False)}
 
+        生成要求：
+        - 必须优先读取并使用提供的产品信息和参数，禁止忽略已有数据
+        - 若有产品信息和参数，按以下逻辑生成：
+        1. 明确对比用户查询与产品参数（如用户问“测温范围”，需直接引用产品的“温度测量范围”参数）
+        2. 先说明结论（如“满足/不满足，因产品XX参数为XX”）
+        3. 推荐相关产品（优先推荐提供的产品，若不满足可补充适配建议）
+        4. 每个产品保留3-5个核心参数（需从提供的参数中选取）
+        5. 最后补充1条针对性选择建议（结合用户查询场景）
+        - 语言简洁，总长度控制在300字内
+        """
     # 调用LLM生成回答并更新状态
     try:
+        print(prompt)
         response = llm.invoke(prompt).content
         state["response"] = response
         print(response)

@@ -36,7 +36,7 @@ def xiaofanAgent():
     graph.add_conditional_edges(
         "detail_search",
         lambda state: (
-            "clarification" if not state.get("product_info")
+            "clarification" if not state.get("product_params")
             else "response_generation"
         )
     )
@@ -73,7 +73,10 @@ graph = build_graph()
 
 # 入口参数要和AgentState字段一致
 inputs = {
-    "user_input": "测试家庭中的地暖，应该用什么型号的热成像仪？"
+    "user_input": "RX-350的测温范围是多少？能否测到-40度到1500度"
 }
 
+# inputs = {
+#     "user_input": "推荐适合户外场景的也成像仪"
+# }
 graph.invoke(inputs)
