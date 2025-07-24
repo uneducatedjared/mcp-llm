@@ -84,9 +84,9 @@ graph = build_graph()
 #     "user_input": "推荐适合户外场景的热成像仪"
 # }
 
-initialize_qdrant_knowledge_base()
+initialize_qdrant_knowledge_base("langrapgh-agent")
 
 inputs = {
-    "user_input": "当我遇到一个新客户，我该如何和新公司破冰"
+    "user_input": "如何对政府部门介绍公司"
 }
 graph.invoke(inputs)

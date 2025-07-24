@@ -22,7 +22,7 @@ def initialize_qdrant_knowledge_base(directory):
         print(f"集合 {collection_name} 已存在，将添加新数据。")
     except:
         # 集合不存在，创建它
-        vector_size = embedding_model.embed_query("test").shape[0]
+        vector_size = 384
         client.create_collection(
             collection_name=collection_name,
             vectors_config=models.VectorParams(size=vector_size, distance=models.Distance.COSINE),
@@ -56,7 +56,7 @@ def initialize_qdrant_knowledge_base(directory):
         
         # 为当前文件的文本块生成唯一 ID
         for i, doc in enumerate(docs):
-            vector = embedding_model.embed_query(doc.page_content)
+            vector = list(embedding_model.embed(doc.page_content))[0]
             all_points.append(
                 models.PointStruct(
                     id=global_point_id + i,  # 使用全局唯一 ID

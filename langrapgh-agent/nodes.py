@@ -118,7 +118,7 @@ def query_knowledgebase(state: AgentState) -> AgentState:
 
     try:
         # 1. Embed the user's query
-        query_vector = embedding_model.embed_query(user_input).tolist()
+        query_vector = list(embedding_model.embed(["query: " + user_input]))[0].tolist()
         # 2. Search Qdrant for relevant documents
         search_result = client.search(
             collection_name=collection_name,  # 指定要搜索的集合
