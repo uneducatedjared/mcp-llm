@@ -1,6 +1,7 @@
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
 from state import AgentState
+from knowledge_base import initialize_qdrant_knowledge_base
 from nodes import (
     intent_detection,
     mumble_search,
@@ -72,11 +73,17 @@ def build_graph():
 graph = build_graph()
 
 # 入口参数要和AgentState字段一致
-inputs = {
-    "user_input": "RX-350的测温范围是多少？能否测到-40度到1500度"
-}
+# inputs = {
+#     "user_input": "RX-350的测温范围是多少？能否测到-40度到1500度"
+# }
 
 # inputs = {
-#     "user_input": "推荐适合户外场景的也成像仪"
+#     "user_input": "推荐适合户外场景的热成像仪"
 # }
+
+initialize_qdrant_knowledge_base()
+
+inputs = {
+    "user_input": "当我遇到一个新客户，我该如何和新公司破冰"
+}
 graph.invoke(inputs)

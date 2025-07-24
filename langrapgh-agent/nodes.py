@@ -21,13 +21,6 @@ llm = ChatDeepSeek(
     base_url="https://api.deepseek.com/v1" # DeepSeek API base URL
 )
 
-class CustomEncoder(json.JSONEncoder):
-    def default(self, o):
-        # 处理langchain消息对象
-        if hasattr(o, "content"):
-            return {"type": o.__class__.__name__, "content": o.content}
-        return super().default(o)
-
 '''
 意图理解节点
 1. 是根据型号查询数据库，返回对应的产品信息进行推荐，也可以提取多个产品型号进行对比
@@ -41,7 +34,12 @@ def intent_detection(state: AgentState) -> AgentState:
     prompt = f"""
     请分析以下用户查询的意图，并以JSON格式返回结果：
     例如：
-    1. mumble_search: 用户查询的内容涉及品类/应用场景，但没有具体的产品型号或参数。例如 “测试地暖的场景，应该选择哪些热成像仪。”
+    1. query_knowledgebase: 用户查询的内容和产品/应用场景无关无关，直接返回
+    {{
+        "query_type": "detail_search | mumble_search | query_knowledgebase",
+        "query": "{user_input}"
+    }}
+    2. mumble_search: 用户查询的内容涉及品类/应用场景，但没有具体的产品型号或参数。例如 “测试地暖的场景，应该选择哪些热成像仪。”
     2. detail_search: 用户查询的内容涉及具体的产品型号或参数。参数和型号主要指字母和数字的组合，比如SF-1323，这样的是产品型号。10V 6A 这样的是产品参数。只有用户的查询中有这些数据，才会被归为detail_search，如果没有这些数据，其他场景为mumble_search。
     返回JSON的条件如下
     如果用户查询的内容涉及具体产品型号或者参数，返回"detail_search"类型，如果用户查询的没有涉及具体的产品型号或者参数，返回"mumble_search"类型,。
@@ -66,7 +64,7 @@ def intent_detection(state: AgentState) -> AgentState:
 
     返回的JSON格式如下：
     {{
-        "query_type": "detail_search | mumble_search",
+        "query_type": "detail_search | mumble_search | query_knowledgebase",
         "query": "{user_input}",
         "product_lines": ["product_line1", "product_line2""]，
         "parameters": {{
@@ -81,7 +79,6 @@ def intent_detection(state: AgentState) -> AgentState:
     """
     # 调用LLM获取意图分析结果
     try:
-
         response_content = llm.invoke(prompt).content
         # Assuming the LLM returns a JSON string that needs parsing
         json_match = re.search(r'```json\s*([\s\S]*?)\s*```', response_content)
@@ -109,6 +106,17 @@ def intent_detection(state: AgentState) -> AgentState:
     state["product_params"] = intent_data.get("parameters", {"models": [], "criteria": {}})
     state["clarification_needed"] = intent_data.get("clarification_needed", False)
     print(state)
+    return state
+
+# 调用知识库内容查询数据
+def query_knowledgebase(state: AgentState) -> AgentState:
+    """
+    处理通用知识查询，利用知识库文档内容回答用户问题。
+    """
+    user_input = state.get("user_input", "")
+    print(f"Handling knowledge base query for: {user_input}")
+
+
     return state
 
 
