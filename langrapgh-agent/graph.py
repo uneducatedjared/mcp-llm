@@ -7,7 +7,8 @@ from nodes import (
     mumble_search,
     detail_search,
     clarification,
-    response_generation
+    response_generation,
+    query_knowledgebase
 )
 
 def xiaofanAgent():
@@ -17,6 +18,7 @@ def xiaofanAgent():
     graph.add_node("intent_detection", intent_detection)
     graph.add_node("detail_search", detail_search)
     graph.add_node("mumble_search", mumble_search)
+    graph.add_node("query_knowledgebase", query_knowledgebase)
     graph.add_node("clarification", clarification)
     graph.add_node("response_generation", response_generation)
 
@@ -29,6 +31,7 @@ def xiaofanAgent():
         "clarification" if state.get("clarification_needed", False)
         else "mumble_search" if state.get("intent", "") == "mumble_search"
         else "detail_search" if state.get("intent", "") == "detail_search"
+        else "query_knowledgebase" if state.get("intent", "") == "query_knowledgebase"
         else "clarification" 
     )
 )

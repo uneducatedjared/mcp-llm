@@ -10,7 +10,7 @@ import re
 import asyncio
 from langgraph.prebuilt import create_react_agent
 from langchain.schema import HumanMessage, SystemMessage
-
+from knowledge_base import client, embedding_model, collection_name, model_name
 load_dotenv()
 
 llm = ChatDeepSeek(
@@ -116,7 +116,39 @@ def query_knowledgebase(state: AgentState) -> AgentState:
     user_input = state.get("user_input", "")
     print(f"Handling knowledge base query for: {user_input}")
 
+    try:
+        # 1. Embed the user's query
+        query_vector = embedding_model.embed_query(user_input).tolist()
+        # 2. Search Qdrant for relevant documents
+        search_result = client.search(
+            collection_name=collection_name,  # 指定要搜索的集合
+            query_vector=query_vector,         # 查询向量（用户问题的向量表示）
+            limit=3,                           # 返回最相似的3个结果
+            append_payload=True                # 是否返回向量附带的元数据（如文本内容、来源）
+        )
+        # 3. Extract relevant content
+        context_docs = []
+        for hit in search_result:
+            context_docs.append(hit.payload.get("text", ""))
 
+        if context_docs:
+            context = "\n\n".join(context_docs)
+            print("Retrieved context from knowledge base:\n", context)
+        else:
+            context = "No relevant information found in the knowledge base"
+            print(context)
+
+        prompt =f"""
+        请根据以下知识库内容回答用户的问题，如果知识库内容中没有足够的信息来回答问题，请说明你无法找到相关信息，请勿编造信息。
+        用户问题：{user_input}
+        知识库内容：{context}
+"""
+        response = llm.invoke(prompt).content
+        state["response"] = response
+        print(f"Generated response based on knowledge base: {response}")
+    except Exception as e:
+        print(f"Error querying knowledge base: {e}")
+        state["response"] = "抱歉，查询知识库出现问题，请稍后再试。"
     return state
 
 

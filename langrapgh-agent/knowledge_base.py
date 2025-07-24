@@ -1,6 +1,6 @@
 from qdrant_client import QdrantClient, models
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from fastembed.embedding import FlagEmbedding as Embedding
+from fastembed import TextEmbedding
 from glob import glob
 import os
 from tqdm import tqdm
@@ -11,7 +11,7 @@ model_name = "BAAI/bge-small-en-v1.5"
 
 
 client = QdrantClient(url="http://localhost:6333")
-embedding_model = Embedding(model_name=model_name, max_length=512)
+embedding_model = TextEmbedding(model_name=model_name, max_length=512)
 
 def initialize_qdrant_knowledge_base(directory):
     markdown_files = glob(os.path.join(directory, "**/*.md"), recursive=True)

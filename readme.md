@@ -1,0 +1,1 @@
+python版本需在3.8到3.11之间，因为对应版本的onnxruntime 1.22.1 支持的python版本中在这个区间
