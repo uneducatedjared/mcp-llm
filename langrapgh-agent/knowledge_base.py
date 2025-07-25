@@ -56,6 +56,7 @@ def initialize_qdrant_knowledge_base(directory):
         
         # 为当前文件的文本块生成唯一 ID
         for i, doc in enumerate(docs):
+            #doc.page_content 原始内容，文本对应的向量
             vector = list(embedding_model.embed(doc.page_content))[0]
             all_points.append(
                 models.PointStruct(

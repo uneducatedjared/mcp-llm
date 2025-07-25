@@ -10,7 +10,7 @@ import re
 import asyncio
 from langgraph.prebuilt import create_react_agent
 from langchain.schema import HumanMessage, SystemMessage
-from knowledge_base import client, embedding_model, collection_name, model_name
+from knowledge_base import client, embedding_model, collection_name
 load_dotenv()
 
 llm = ChatDeepSeek(
@@ -27,7 +27,6 @@ llm = ChatDeepSeek(
 2. 是模糊查询用户给品类/应用场景 产品
 '''
 def intent_detection(state: AgentState) -> AgentState:
-
     user_input = state.get("user_input", "")
     print(state)
     # 定义提示词，引导LLM识别用户意图
@@ -118,7 +117,7 @@ def query_knowledgebase(state: AgentState) -> AgentState:
 
     try:
         # 1. Embed the user's query
-        query_vector = list(embedding_model.embed(["query: " + user_input]))[0].tolist()
+        query_vector = list(embedding_model.embed(["query: " + user_input]))[0]
         # 2. Search Qdrant for relevant documents
         search_result = client.search(
             collection_name=collection_name,  # 指定要搜索的集合
@@ -142,7 +141,7 @@ def query_knowledgebase(state: AgentState) -> AgentState:
         请根据以下知识库内容回答用户的问题，如果知识库内容中没有足够的信息来回答问题，请说明你无法找到相关信息，请勿编造信息。
         用户问题：{user_input}
         知识库内容：{context}
-"""
+        """
         response = llm.invoke(prompt).content
         state["response"] = response
         print(f"Generated response based on knowledge base: {response}")
