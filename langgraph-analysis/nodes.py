@@ -127,3 +127,29 @@ def execute_node(state: State):
     state['observations'] = messages_for_llm # Update observations with the full conversation for this step
     
     return Command(goto='update_planner', update={'plan': plan})
+
+
+
+def report_node(state: State):
+    """Report node that write a final report."""
+    logger.info("***正在运行report_node***")
+    
+    observations = state.get("observations")
+    messages = observations + [SystemMessage(content=REPORT_SYSTEM_PROMPT)]
+    
+    while True:
+        response = llm.bind_tools([create_file, shell_exec]).invoke(messages)
+        response = response.model_dump_json(indent=4, exclude_none=True)
+        response = json.loads(response)
+        tools = {"create_file": create_file, "shell_exec": shell_exec} 
+        if response['tool_calls']:    
+            for tool_call in response['tool_calls']:
+                tool_name = tool_call['name']
+                tool_args = tool_call['args']
+                tool_result = tools[tool_name].invoke(tool_args)
+                logger.info(f"tool_name:{tool_name},tool_args:{tool_args}\ntool_result:{tool_result}")
+                messages += [ToolMessage(content=f"tool_name:{tool_name},tool_args:{tool_args}\ntool_result:{tool_result}", tool_call_id=tool_call['id'])]
+        else:
+            break
+            
+    return {"final_report": response['content']}

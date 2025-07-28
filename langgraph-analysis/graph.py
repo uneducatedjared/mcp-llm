@@ -1,6 +1,7 @@
 from nodes import (
     create_planner_node,
     update_planner_node,
+    report_node,
     execute_node
 )
 from langgraph.graph import StateGraph, START, END
@@ -12,8 +13,8 @@ def build_graph():
     builder.add_node("create_planner", create_planner_node)
     builder.add_node("update_planner", update_planner_node)
     builder.add_node("execute_node", execute_node)
-    # builder.add_node("report", report_node)
-    # builder.add_edge("report", END)
+    builder.add_node("report", report_node)
+    builder.add_edge("report", END)
     return builder.compile()
 
 
